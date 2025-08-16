@@ -5,6 +5,7 @@ import requests, os
 from dotenv import load_dotenv
 
 #Commands in Linux
+# pip install -r requirements.txt
 # source ChatENV/bin/activate   this will run my created environment
 # uvicorn ChatBot:app --reload  this will run backend on Linux and generates api URL which can be used to test API in Postman etc...
 # open index.html in browser manually OR vs code / cursor extension "Live Server"
@@ -27,7 +28,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str
-    
+
 @app.get("/")
 def root():
     return {"message": "Tour Guide Chatbot API is running"}
