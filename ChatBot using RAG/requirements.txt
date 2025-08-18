@@ -1,0 +1,12 @@
+fastapi==0.111.0           # Web framework for API
+uvicorn[standard]==0.30.1  # ASGI server for FastAPI
+pydantic==2.7.4            # Data validation and settings management
+python-dotenv==1.0.1       # Load environment variables from .env
+requests==2.32.3           # HTTP requests for external APIs
+sentence-transformers==2.7.0 # Embedding model for semantic search
+langdetect==1.0.9          # Language detection for user input
+transformers==4.42.4       # HuggingFace Transformers for intent/summarization
+accelerate==0.33.0         # Efficient model inference
+torch>=2.2.0               # PyTorch backend for ML models
+numpy==1.26.4              # Numerical operations
+chromadb==0.5.5            # Vector database for RAG retrieval
