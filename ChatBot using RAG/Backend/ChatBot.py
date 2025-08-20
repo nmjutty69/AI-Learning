@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 import chromadb
 from sentence_transformers import SentenceTransformer
-from groq import Groq   # 👈 NEW
+from groq import Groq
 
 # -----------------------
 # Load Environment
@@ -21,10 +21,14 @@ MAX_TURNS = int(os.getenv("MAX_HISTORY_TURNS", 6))
 CHROMA_DB_PATH = os.getenv("CHROMA_DB", "chroma_db")
 EMB_MODEL = os.getenv("EMB_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
-# 👇 NEW: Groq API setup
+# Groq API setup
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GEN_MODEL = os.getenv("GEN_MODEL")
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+# Eleven Labs Setup
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
 
 # -----------------------
 # App Setup
@@ -137,3 +141,43 @@ def chat(req: ChatRequest):
     append_history(session_id, "assistant", reply)
 
     return ChatResponse(reply=reply, retrieved=retrieved, session_id=session_id)
+
+
+@app.post("/speak", response_model=ChatResponse)
+async def speak(file: UploadFile = File(...), session_id: Optional[str] = None, use_rag: Optional[bool] = True):
+    session_id = session_id or str(uuid.uuid4())
+
+    # 1️⃣ Convert audio to text
+    recognizer = sr.Recognizer()
+    audio_text = ""
+    try:
+        with sr.AudioFile(file.file) as source:
+            audio_data = recognizer.record(source)
+            audio_text = recognizer.recognize_google(audio_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Speech recognition failed: {str(e)}")
+
+    # 2️⃣ Pass text to your existing chat function logic
+    chat_req = ChatRequest(message=audio_text, session_id=session_id, use_rag=use_rag)
+    chat_resp = chat(chat_req)
+
+    # 3️⃣ Convert assistant reply to speech using ElevenLabs
+    try:
+        tts_response = requests.post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}",
+            headers={
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json={"text": chat_resp.reply, "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}},
+        )
+        tts_response.raise_for_status()
+        audio_bytes = tts_response.content
+        # Save audio to file (optional)
+        with open(f"output_{session_id}.mp3", "wb") as f:
+            f.write(audio_bytes)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ElevenLabs TTS error: {str(e)}")
+
+    # 4️⃣ Return chat reply + retrieved context
+    return ChatResponse(reply=chat_resp.reply, retrieved=chat_resp.retrieved, session_id=session_id)

@@ -161,6 +161,25 @@
       font-size: 18px;
       cursor: pointer;
     }
+
+    .voice-btn {
+      margin-left: 10px;
+      background-color: #00796b;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .voice-btn.recording {
+      background-color: #d32f2f;
+    }
   </style>
 </head>
 
@@ -181,13 +200,6 @@
           <strong>🌍 Travel Guide:</strong>
           <div class="mt-2">Hello traveler! ✈️ I'm your AI-powered Assistant. Where would you like to explore today?
           </div>
-          <div class="suggestions mt-3">
-            <button class="suggestion-btn" onclick="sendSuggestion('Best places to visit in Pakistan')">Pakistan
-              highlights</button>
-            <button class="suggestion-btn" onclick="sendSuggestion('Affordable Saudi Arabian destinations')">Saudi
-              Arabia on budget</button>
-            <button class="suggestion-btn" onclick="sendSuggestion('Beach resorts in Turkey')">Turkey beaches</button>
-          </div>
         </div>
       </div>
     </div>
@@ -195,18 +207,100 @@
     <div class="input-container">
       <input type="text" id="messageInput" placeholder="Ask about destinations, attractions, or travel tips..." />
       <button onclick="sendMessage()">➤</button>
+      <button id="voiceBtn" class="voice-btn">🎤</button>
+      <button id="stopAudioBtn" class="voice-btn">⏹️</button>
     </div>
   </div>
 
   <script>
     const chat = document.getElementById("chat");
     const input = document.getElementById("messageInput");
+    const voiceBtn = document.getElementById("voiceBtn");
+
+
+    let mediaRecorder;
+    let audioChunks = [];
+
+    // Voice Recording
+    voiceBtn.addEventListener("click", async () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        // stop recording
+        mediaRecorder.stop();
+        voiceBtn.classList.remove("recording");
+        voiceBtn.textContent = "🎤";
+      } else {
+        // start recording
+        audioChunks = [];
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          sendVoice(audioBlob);
+        };
+        mediaRecorder.start();
+        voiceBtn.classList.add("recording");
+        voiceBtn.textContent = "⏹️";
+      }
+    });
+
+    //Voice API call
+    let currentAudio = null;
+    let isPaused = false;
+
+    // Pause/Resume TTS playback
+    const stopAudioBtn = document.getElementById("stopAudioBtn");
+    stopAudioBtn.addEventListener("click", () => {
+      if (!currentAudio) return;
+
+      if (currentAudio.paused) {
+        // Resume
+        currentAudio.play();
+        stopAudioBtn.textContent = "⏸️"; // show pause icon
+      } else {
+        // Pause
+        currentAudio.pause();
+        stopAudioBtn.textContent = "▶️"; // show play icon
+      }
+    });
+    // Send Voice Audio
+    async function sendVoice(audioBlob) {
+      addMessage("user", "🎙️ Sending voice...");
+      try {
+        const formData = new FormData();
+        formData.append("file", audioBlob, "voice.wav");
+
+        const response = await fetch("http://127.0.0.1:8000/speak", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+        addMessage("assistant", data.reply);
+
+        // Play returned TTS audio
+        const audioResponse = await fetch(`output_${data.session_id}.mp3`);
+        const audioBlobResp = await audioResponse.blob();
+        const audioUrl = URL.createObjectURL(audioBlobResp);
+
+        // Stop any previous audio first
+        if (currentAudio && !currentAudio.paused) currentAudio.pause();
+
+        currentAudio = new Audio(audioUrl);
+        currentAudio.play();
+        stopAudioBtn.textContent = "⏸️"; // reset button to pause
+      } catch (err) {
+        addMessage("assistant", "⚠️ Error processing voice message.");
+      }
+    }
+
 
     const avatars = {
       user: "https://img.icons8.com/?size=100&id=124204&format=png&color=000000",
       assistant: "https://img.icons8.com/?size=100&id=OqyQGX90jaU0&format=png&color=000000"
     };
 
+    //Gets Response from Backend CHAT
     async function sendMessage() {
       const message = input.value.trim();
       if (!message) return;
@@ -225,22 +319,6 @@
         addMessage("assistant", "⚠️ Error connecting to backend.");
       }
     }
-
-    function sendSuggestion(text) {
-      addMessage("user", text);
-      input.value = "";
-
-      // Actually call the backend (same as sendMessage)
-      fetch("http://127.0.0.1:8000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text })
-      })
-        .then(res => res.json())
-        .then(data => addMessage("assistant", data.reply))
-        .catch(() => addMessage("assistant", "⚠️ Error connecting to backend."));
-    }
-
 
     function addMessage(role, text) {
       const row = document.createElement("div");
