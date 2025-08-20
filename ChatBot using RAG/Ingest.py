@@ -1,10 +1,19 @@
-from langchain.document_loaders import TextLoader, PyPDFLoader
+from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Chroma
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+import os
+
+# Make sure docs folder exists
+os.makedirs("docs", exist_ok=True)
 
 # 1. Load docs
-loader = PyPDFLoader("docs/myfile.pdf")   # or TextLoader("docs/myfile.txt")
+# 👉 If you have a text file
+loader = TextLoader("Pakistan.txt")
+
+# 👉 Or if you want to use PDF instead:
+# loader = PyPDFLoader("Pakistan.pdf")
+
 documents = loader.load()
 
 # 2. Split docs into chunks
@@ -18,4 +27,4 @@ embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6
 db = Chroma.from_documents(docs, embedding=embedder, persist_directory="chroma_db")
 db.persist()
 
-print("Docs ingested and saved in chroma_db/")
+print("Docs Ingested and Saved in chroma_db/")

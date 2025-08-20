@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,7 +9,8 @@
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #7fa18e; /* light mint green */
+      background-color: #7fa18e;
+      /* light mint green */
       margin: 0;
       padding: 0;
       display: flex;
@@ -20,13 +22,14 @@
     .chat-wrapper {
       width: 100%;
       max-width: 1000px;
-      height: 70vh; /* locked height */
+      height: 70vh;
+      /* locked height */
       display: flex;
       flex-direction: column;
       border: 1px solid #ccc;
       border-radius: 12px;
       background: #f7fdf9;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       overflow: hidden;
     }
 
@@ -36,7 +39,8 @@
       gap: 10px;
       background-color: #00332c;
       color: #fff;
-      padding: 15px 20px; /* increased padding */
+      padding: 15px 20px;
+      /* increased padding */
     }
 
     .chat-header img {
@@ -57,17 +61,20 @@
 
     .chat-container {
       flex: 1;
-      padding: 25px; /* more breathing space */
+      padding: 25px;
+      /* more breathing space */
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 20px; /* more gap between messages */
+      gap: 20px;
+      /* more gap between messages */
     }
 
     .message-row {
       display: flex;
       align-items: flex-end;
-      gap: 12px; /* increased space between avatar & bubble */
+      gap: 12px;
+      /* increased space between avatar & bubble */
     }
 
     .message-row.user {
@@ -87,7 +94,7 @@
       border-radius: 20px;
       font-size: 15px;
       line-height: 1.4;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       word-wrap: break-word;
     }
 
@@ -106,7 +113,8 @@
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      margin-top: 12px; /* spacing above suggestions */
+      margin-top: 12px;
+      /* spacing above suggestions */
     }
 
     .suggestion-btn {
@@ -124,7 +132,8 @@
 
     .input-container {
       display: flex;
-      padding: 18px; /* more spacing */
+      padding: 18px;
+      /* more spacing */
       border-top: 1px solid #ccc;
       background-color: #fdfdfd;
     }
@@ -154,6 +163,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="chat-wrapper">
     <div class="chat-header">
@@ -169,10 +179,13 @@
         <img src="https://img.icons8.com/?size=100&id=OqyQGX90jaU0&format=png&color=000000" class="avatar">
         <div class="bubble">
           <strong>🌍 Travel Guide:</strong>
-          <div class="mt-2">Hello traveler! ✈️ I'm your AI-powered Assistant. Where would you like to explore today?</div>
+          <div class="mt-2">Hello traveler! ✈️ I'm your AI-powered Assistant. Where would you like to explore today?
+          </div>
           <div class="suggestions mt-3">
-            <button class="suggestion-btn" onclick="sendSuggestion('Best places to visit in Pakistan')">Pakistan highlights</button>
-            <button class="suggestion-btn" onclick="sendSuggestion('Affordable Saudi Arabian destinations')">Saudi Arabia on budget</button>
+            <button class="suggestion-btn" onclick="sendSuggestion('Best places to visit in Pakistan')">Pakistan
+              highlights</button>
+            <button class="suggestion-btn" onclick="sendSuggestion('Affordable Saudi Arabian destinations')">Saudi
+              Arabia on budget</button>
             <button class="suggestion-btn" onclick="sendSuggestion('Beach resorts in Turkey')">Turkey beaches</button>
           </div>
         </div>
@@ -216,9 +229,18 @@
     function sendSuggestion(text) {
       addMessage("user", text);
       input.value = "";
-      // mimic backend call
-      setTimeout(() => addMessage("assistant", `Here’s what I found about: ${text}`), 600);
+
+      // Actually call the backend (same as sendMessage)
+      fetch("http://127.0.0.1:8000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      })
+        .then(res => res.json())
+        .then(data => addMessage("assistant", data.reply))
+        .catch(() => addMessage("assistant", "⚠️ Error connecting to backend."));
     }
+
 
     function addMessage(role, text) {
       const row = document.createElement("div");
@@ -230,7 +252,7 @@
 
       const bubble = document.createElement("div");
       bubble.className = "bubble";
-      bubble.textContent = text;
+      bubble.innerHTML = text;
 
       row.appendChild(avatar);
       row.appendChild(bubble);
@@ -239,7 +261,7 @@
     }
 
     // Trigger send on Enter key
-    input.addEventListener("keydown", function(event) {
+    input.addEventListener("keydown", function (event) {
       if (event.key === "Enter") {
         event.preventDefault();
         sendMessage();
@@ -247,4 +269,5 @@
     });
   </script>
 </body>
+
 </html>
