@@ -208,118 +208,174 @@
       <input type="text" id="messageInput" placeholder="Ask about destinations, attractions, or travel tips..." />
       <button onclick="sendMessage()">➤</button>
       <button id="voiceBtn" class="voice-btn">🎤</button>
-      <button id="stopAudioBtn" class="voice-btn">⏹️</button>
+      <button id="stopAudioBtn" class="voice-btn">🔊</button>
     </div>
   </div>
 
   <script>
+    const API_BASE = "http://127.0.0.1:8000";
+    const CHAT_URL = `${API_BASE}/chat`;
+    const SPEAK_URL = `${API_BASE}/speak`;
+
     const chat = document.getElementById("chat");
     const input = document.getElementById("messageInput");
     const voiceBtn = document.getElementById("voiceBtn");
-
-
-    let mediaRecorder;
-    let audioChunks = [];
-
-    // Voice Recording
-    voiceBtn.addEventListener("click", async () => {
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        // stop recording
-        mediaRecorder.stop();
-        voiceBtn.classList.remove("recording");
-        voiceBtn.textContent = "🎤";
-      } else {
-        // start recording
-        audioChunks = [];
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-          sendVoice(audioBlob);
-        };
-        mediaRecorder.start();
-        voiceBtn.classList.add("recording");
-        voiceBtn.textContent = "⏹️";
-      }
-    });
-
-    //Voice API call
-    let currentAudio = null;
-    let isPaused = false;
-
-    // Pause/Resume TTS playback
     const stopAudioBtn = document.getElementById("stopAudioBtn");
-    stopAudioBtn.addEventListener("click", () => {
-      if (!currentAudio) return;
-
-      if (currentAudio.paused) {
-        // Resume
-        currentAudio.play();
-        stopAudioBtn.textContent = "⏸️"; // show pause icon
-      } else {
-        // Pause
-        currentAudio.pause();
-        stopAudioBtn.textContent = "▶️"; // show play icon
-      }
-    });
-    // Send Voice Audio
-    async function sendVoice(audioBlob) {
-      addMessage("user", "🎙️ Sending voice...");
-      try {
-        const formData = new FormData();
-        formData.append("file", audioBlob, "voice.wav");
-
-        const response = await fetch("http://127.0.0.1:8000/speak", {
-          method: "POST",
-          body: formData
-        });
-
-        const data = await response.json();
-        addMessage("assistant", data.reply);
-
-        // Play returned TTS audio
-        const audioResponse = await fetch(`output_${data.session_id}.mp3`);
-        const audioBlobResp = await audioResponse.blob();
-        const audioUrl = URL.createObjectURL(audioBlobResp);
-
-        // Stop any previous audio first
-        if (currentAudio && !currentAudio.paused) currentAudio.pause();
-
-        currentAudio = new Audio(audioUrl);
-        currentAudio.play();
-        stopAudioBtn.textContent = "⏸️"; // reset button to pause
-      } catch (err) {
-        addMessage("assistant", "⚠️ Error processing voice message.");
-      }
-    }
-
 
     const avatars = {
       user: "https://img.icons8.com/?size=100&id=124204&format=png&color=000000",
       assistant: "https://img.icons8.com/?size=100&id=OqyQGX90jaU0&format=png&color=000000"
     };
 
-    //Gets Response from Backend CHAT
-    async function sendMessage() {
-      const message = input.value.trim();
+    let currentAudio = null;
+    let sessionId = null;
+    let isSpeaking = false;
+    let recognition = null;
+    let listening = false;
+
+    // ---------- TTS ----------
+    async function playVoice(text) {
+      stopSpeaking();
+      isSpeaking = true;
+      stopAudioBtn.textContent = "🔇";
+
+      try {
+        const voiceRes = await fetch(SPEAK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+
+        const ct = voiceRes.headers.get("content-type") || "";
+        if (!voiceRes.ok || !ct.includes("audio/mpeg")) {
+          throw new Error(`Invalid TTS response (${voiceRes.status})`);
+        }
+
+        const audioBlob = await voiceRes.blob();
+        const audioURL = URL.createObjectURL(audioBlob);
+        currentAudio = new Audio(audioURL);
+        currentAudio.play();
+        currentAudio.onended = () => {
+          isSpeaking = false;
+          currentAudio = null;
+        };
+      } catch (error) {
+        console.warn("Voice API failed, using SpeechSynthesis fallback.", error);
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.onend = () => { isSpeaking = false; };
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    function stopSpeaking() {
+      if (speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+      }
+      if (currentAudio && !currentAudio.paused) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+      }
+      isSpeaking = false;
+      stopAudioBtn.textContent = "🔊"; // back to play
+    }
+
+    // ---------- Chat (text) ----------
+    async function sendMessage(messageText = null) {
+      const message = messageText || input.value.trim();
       if (!message) return;
+
       addMessage("user", message);
       input.value = "";
 
       try {
-        const response = await fetch("http://127.0.0.1:8000/chat", {
+        const res = await fetch(CHAT_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message })
+          body: JSON.stringify({ message, session_id: sessionId })
         });
-        const data = await response.json();
-        addMessage("assistant", data.reply);
-      } catch (err) {
+        const data = await res.json();
+
+        const reply = data?.reply || "I couldn’t form a reply.";
+        if (!sessionId) sessionId = data?.session_id || sessionId;
+
+        addMessage("assistant", reply);
+        playVoice(reply);
+
+      } catch {
         addMessage("assistant", "⚠️ Error connecting to backend.");
       }
     }
 
+    // Enter-to-send
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // ---------- Voice (webkitSpeechRecognition) ----------
+    function toggleRecord() {
+      if (!('webkitSpeechRecognition' in window)) {
+        addMessage("assistant", "❌ Browser doesn’t support webkitSpeechRecognition.");
+        return;
+      }
+
+      if (!listening) {
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = false;  // one-shot, can switch to true for streaming
+        recognition.interimResults = false; // only final result
+        recognition.lang = "en-US";
+
+        recognition.onstart = () => {
+          listening = true;
+          voiceBtn.textContent = "⏹️"; // show stop
+          addMessage("assistant", "🎤 Listening...");
+        };
+
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript.trim();
+          if (transcript) {
+            sendMessage(transcript); // 🚀 send instantly
+          }
+        };
+
+        recognition.onerror = (e) => {
+          addMessage("assistant", "⚠️ Speech recognition error: " + e.error);
+        };
+
+        recognition.onend = () => {
+          listening = false;
+          voiceBtn.textContent = "🎤"; // reset
+        };
+
+        recognition.start();
+      } else {
+        recognition.stop();
+        listening = false;
+        voiceBtn.textContent = "🎤";
+      }
+    }
+
+    voiceBtn.addEventListener("click", toggleRecord);
+
+    // ---------- Toggle Audio Button ----------
+    stopAudioBtn.addEventListener("click", () => {
+      if (isSpeaking) {
+        // 🔇 pressed while playing → stop
+        stopSpeaking();
+      } else {
+        // 🔊 pressed while idle → replay last message if available
+        const lastAssistantMsg = [...chat.querySelectorAll(".assistant .bubble")].pop();
+        if (lastAssistantMsg) {
+          playVoice(lastAssistantMsg.innerText);
+        }
+      }
+    });
+
+    // ---------- UI helpers ----------
     function addMessage(role, text) {
       const row = document.createElement("div");
       row.className = `message-row ${role}`;
@@ -330,22 +386,15 @@
 
       const bubble = document.createElement("div");
       bubble.className = "bubble";
-      bubble.innerHTML = text;
+      bubble.innerText = text;
 
       row.appendChild(avatar);
       row.appendChild(bubble);
       chat.appendChild(row);
       chat.scrollTop = chat.scrollHeight;
     }
-
-    // Trigger send on Enter key
-    input.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        sendMessage();
-      }
-    });
   </script>
 </body>
+
 
 </html>
