@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tourist AI Guide</title>
+  <link rel="icon" type="image/png" href="https://img.icons8.com/?size=100&id=rBh1fuOC6Bjx&format=png&color=000000">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #7fa18e;
+      /* light mint green */
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .chat-wrapper {
+      width: 100%;
+      max-width: 1000px;
+      height: 70vh;
+      /* locked height */
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      background: #f7fdf9;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background-color: #00332c;
+      color: #fff;
+      padding: 15px 20px;
+      /* increased padding */
+    }
+
+    .chat-header img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    .chat-header h5 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .chat-header small {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .chat-container {
+      flex: 1;
+      padding: 25px;
+      /* more breathing space */
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      /* more gap between messages */
+    }
+
+    .message-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      /* increased space between avatar & bubble */
+    }
+
+    .message-row.user {
+      flex-direction: row-reverse;
+    }
+
+    .avatar {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .bubble {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 20px;
+      font-size: 15px;
+      line-height: 1.4;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      word-wrap: break-word;
+    }
+
+    .assistant .bubble {
+      background-color: #ffffff;
+      border-bottom-left-radius: 5px;
+    }
+
+    .user .bubble {
+      background-color: #00332c;
+      color: #fff;
+      border-bottom-right-radius: 5px;
+    }
+
+    .suggestions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      /* spacing above suggestions */
+    }
+
+    .suggestion-btn {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .suggestion-btn:hover {
+      background: #f0f0f0;
+    }
+
+    .input-container {
+      display: flex;
+      padding: 18px;
+      /* more spacing */
+      border-top: 1px solid #ccc;
+      background-color: #fdfdfd;
+    }
+
+    .input-container input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+      outline: none;
+    }
+
+    .input-container button {
+      margin-left: 12px;
+      background-color: #00332c;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .voice-btn {
+      margin-left: 10px;
+      background-color: #00796b;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .voice-btn.recording {
+      background-color: #d32f2f;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="chat-wrapper">
+    <div class="chat-header">
+      <img src="https://img.icons8.com/?size=100&id=rBh1fuOC6Bjx&format=png&color=000000" alt="HealthCare Guide">
+      <div>
+        <h5 class="mb-0">AI HealthCare Guide</h5>
+        <small>Powered by LLama 3.1</small>
+      </div>
+    </div>
+
+    <div class="chat-container" id="chat">
+      <div class="message-row assistant">
+        <img src="https://img.icons8.com/?size=100&id=51823&format=png&color=000000" class="avatar">
+        <div class="bubble">
+          <strong>HealthCare Guide:</strong>
+          <div class="mt-2">Hello HealthCare Companian! 💊 I'm your AI-powered Assistant. How can I support your wellness journey today?
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-container">
+      <input type="text" id="messageInput" placeholder="Ask about destinations, attractions, or HealthCare tips..." />
+      <button onclick="sendMessage()">➤</button>
+      <button id="voiceBtn" class="voice-btn">🎤</button>
+      <button id="stopAudioBtn" class="voice-btn">🔊</button>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:8000";
+    const CHAT_URL = `${API_BASE}/chat`;
+    const SPEAK_URL = `${API_BASE}/speak`;
+
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("messageInput");
+    const voiceBtn = document.getElementById("voiceBtn");
+    const stopAudioBtn = document.getElementById("stopAudioBtn");
+
+    const avatars = {
+      user: "https://img.icons8.com/?size=100&id=51868&format=png&color=000000",
+      assistant: "https://img.icons8.com/?size=100&id=51823&format=png&color=000000"
+    };
+
+    let currentAudio = null;
+    let sessionId = null;
+    let isSpeaking = false;
+    let recognition = null;
+    let listening = false;
+
+    // ---------- TTS ----------
+    async function playVoice(text) {
+      stopSpeaking();
+      isSpeaking = true;
+      stopAudioBtn.textContent = "🔇";
+
+      try {
+        const voiceRes = await fetch(SPEAK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+
+        const ct = voiceRes.headers.get("content-type") || "";
+        if (!voiceRes.ok || !ct.includes("audio/mpeg")) {
+          throw new Error(`Invalid TTS response (${voiceRes.status})`);
+        }
+
+        const audioBlob = await voiceRes.blob();
+        const audioURL = URL.createObjectURL(audioBlob);
+        currentAudio = new Audio(audioURL);
+        currentAudio.play();
+        currentAudio.onended = () => {
+          isSpeaking = false;
+          currentAudio = null;
+        };
+      } catch (error) {
+        console.warn("Voice API failed, using SpeechSynthesis fallback.", error);
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.onend = () => { isSpeaking = false; };
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    function stopSpeaking() {
+      if (speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+      }
+      if (currentAudio && !currentAudio.paused) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+      }
+      isSpeaking = false;
+      stopAudioBtn.textContent = "🔊"; // back to play
+    }
+
+    // ---------- Chat (text) ----------
+    async function sendMessage(messageText = null) {
+      const message = messageText || input.value.trim();
+      if (!message) return;
+
+      addMessage("user", message);
+      input.value = "";
+
+      try {
+        const res = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, session_id: sessionId })
+        });
+        const data = await res.json();
+
+        const reply = data?.reply || "I couldn’t form a reply.";
+        if (!sessionId) sessionId = data?.session_id || sessionId;
+
+        addMessage("assistant", reply);
+        playVoice(reply);
+
+      } catch {
+        addMessage("assistant", "⚠️ Error connecting to backend.");
+      }
+    }
+
+    // Enter-to-send
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // ---------- Voice (webkitSpeechRecognition) ----------
+    function toggleRecord() {
+      if (!('webkitSpeechRecognition' in window)) {
+        addMessage("assistant", "❌ Browser doesn’t support webkitSpeechRecognition.");
+        return;
+      }
+
+      if (!listening) {
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = false;  // one-shot, can switch to true for streaming
+        recognition.interimResults = false; // only final result
+        recognition.lang = "en-US";
+
+        recognition.onstart = () => {
+          listening = true;
+          voiceBtn.textContent = "⏹️"; // show stop
+          addMessage("assistant", "🎤 Listening...");
+        };
+
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript.trim();
+          if (transcript) {
+            sendMessage(transcript); // 🚀 send instantly
+          }
+        };
+
+        recognition.onerror = (e) => {
+          addMessage("assistant", "⚠️ Speech recognition error: " + e.error);
+        };
+
+        recognition.onend = () => {
+          listening = false;
+          voiceBtn.textContent = "🎤"; // reset
+        };
+
+        recognition.start();
+      } else {
+        recognition.stop();
+        listening = false;
+        voiceBtn.textContent = "🎤";
+      }
+    }
+
+    voiceBtn.addEventListener("click", toggleRecord);
+
+    // ---------- Toggle Audio Button ----------
+    stopAudioBtn.addEventListener("click", () => {
+      if (isSpeaking) {
+        // 🔇 pressed while playing → stop
+        stopSpeaking();
+      } else {
+        // 🔊 pressed while idle → replay last message if available
+        const lastAssistantMsg = [...chat.querySelectorAll(".assistant .bubble")].pop();
+        if (lastAssistantMsg) {
+          playVoice(lastAssistantMsg.innerText);
+        }
+      }
+    });
+
+    // ---------- UI helpers ----------
+    function addMessage(role, text) {
+      const row = document.createElement("div");
+      row.className = `message-row ${role}`;
+
+      const avatar = document.createElement("img");
+      avatar.src = avatars[role];
+      avatar.className = "avatar";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.innerText = text;
+
+      row.appendChild(avatar);
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+
+
+</html>

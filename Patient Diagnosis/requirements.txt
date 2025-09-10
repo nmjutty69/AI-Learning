@@ -1,0 +1,29 @@
+# FastAPI backend
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+requests
+
+# Core ML / embeddings
+sentence-transformers
+numpy
+groq
+
+# LangChain ecosystem
+langchain
+langchain-community
+langchain-chroma
+langchain-huggingface
+
+# Vector DB
+chromadb
+
+# Text loaders & NLP utils
+pypdf
+unstructured
+langdetect
+
+# Voice/audio support
+SpeechRecognition
+pydub
